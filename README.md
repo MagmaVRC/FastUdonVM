@@ -2,7 +2,7 @@
 
 An editor-only, drop-in replacement for VRChat's Udon virtual machine. It runs the same bytecode against the same heap and the same extern wrapper as the stock VM, produces the same results, and spends a fraction of the time doing it. Nothing in this package ships in a world; the client always runs the stock VM. It exists to measure what a faster VM would buy, to test worlds faster in the editor, and as a concrete, compatible proposal.
 
-Companion: the [Udon Profiler](../dev.magmavrc.udonprofiler) (`Window > Udon Profiler`) shows per-script, per-event, per-extern cost and was used for every number below.
+The numbers below were captured with the companion Udon Profiler (`Window > Udon Profiler`), which shows per-script, per-event and per-extern cost.
 
 ## Quick start
 
@@ -14,7 +14,7 @@ Run your world in play mode as usual. If anything behaves differently from the s
 
 ## How Udon works
 
-Everything below was established by reading the SDK's shipped assemblies (`VRC.Udon.VM`, `VRC.Udon.Common`, `VRC.Udon.Wrapper`, `VRC.Udon.ClientBindings`, `VRC.Udon.UAssembly`, `VRC.Udon.Security`) and the open `UdonBehaviour` / `UdonManager` source. The full reference is in `docs/udon-runtime.md`; this is the short version.
+Everything below was established by reading the SDK's shipped assemblies (`VRC.Udon.VM`, `VRC.Udon.Common`, `VRC.Udon.Wrapper`, `VRC.Udon.ClientBindings`, `VRC.Udon.UAssembly`, `VRC.Udon.Security`) and the open `UdonBehaviour` / `UdonManager` source. This is the short version.
 
 ### A program
 
@@ -103,7 +103,7 @@ Same bytecode, same heap object, same wrapper, same results - only `Interpret()`
 
 **Filtered object ops.** `UnityEngine.Object ==`, `!=`, truthiness and `Utilities.IsValid` run the same security-filter instance the wrapper uses, directly on the slot value.
 
-No new opcodes, no heap layout change, no JIT. A program that works on the stock VM works here, and a world cannot tell the difference from inside its own bytecode. The one observable deviation is that the slot holding an extern's signature string keeps its string instead of the stock VM's cached delegate object; bytecode cannot read that slot.
+No new opcodes, no heap layout change. A program that works on the stock VM works here, and a world cannot tell the difference from inside its own bytecode. The one observable deviation is that the slot holding an extern's signature string keeps its string instead of the stock VM's cached delegate object; bytecode cannot read that slot.
 
 ## Measured
 
@@ -138,29 +138,5 @@ The package is only as useful as it is trustworthy, so equivalence is tested, no
 - **Object ops and inline caches** have their own tests with live, destroyed and null Unity objects and with program swaps between calls.
 
 Run `MagmaVRC.UdonVM.Tests` in the Test Runner (EditMode). A full failure list is written to `Library/udonvm-testresults.txt`.
-
-## What it is not
-
-- Not a JIT. Compiling bytecode to IL would be another 10× and is possible in principle, but the interpreter *is* the sandbox, and Quest cannot JIT at all; a production version would need compile-time enforcement of the extern whitelist and ahead-of-time compilation at upload. The design keeps that door open behind the same `IUdonVM` surface (`docs/udon-runtime.md` §11).
-- Not native code. The values and the calls are all managed; a C++ interpreter would pay a marshalling boundary on every one of them.
-- Not vectorised. Udon operations are scalar over independent boxed slots; there is nothing for SIMD to operate on.
-
-## Layout
-
-```
-Editor/
-  FastUdonVM.cs             the interpreter
-  FusedOps.cs               registry and helpers
-  FusedOps.Table.cs         generated pure externs
-  FusedOps.Objects.cs       Unity/object equality with the security filter
-  FusedOps.Vrc.cs           VRC SDK pure externs
-  SiteCache.cs              inline caches for cross-behaviour calls
-  HeapAccess.cs             direct slot access
-  FastUdonVMInstaller.cs    Harmony hook on UdonManager.ConstructUdonVM
-  FastUdonVMSettings.cs     menu and prefs
-  FastUdonVMStats.cs        counters
-  FastUdonVMBenchmark.cs    synthetic benchmark
-Tests/Editor/               differential, equivalence, corpus, object-op and site-cache tests
-```
 
 License: MIT.
