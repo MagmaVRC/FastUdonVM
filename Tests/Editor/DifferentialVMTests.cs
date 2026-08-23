@@ -78,7 +78,9 @@ namespace MagmaVRC.UdonVM.Tests
             var (stock, _) = VMDifferential.Compare(UAssemblyPrograms.DivideByZero, fused);
             Assert.IsInstanceOf<UdonVMException>(stock.Error);
             Assert.IsInstanceOf<UdonVMException>(stock.Error.InnerException);
-            Assert.IsInstanceOf<DivideByZeroException>(stock.Error.InnerException.InnerException);
+            var root = stock.Error;
+            while (root.InnerException != null) root = root.InnerException;
+            Assert.IsInstanceOf<DivideByZeroException>(root);
         }
 
         [TestCase(true), TestCase(false)]

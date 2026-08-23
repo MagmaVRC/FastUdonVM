@@ -14,7 +14,7 @@ namespace MagmaVRC.UdonVM
     {
         const string HarmonyId = "dev.magmavrc.udonvm";
         static readonly IUdonVMTimeSource TimeSource = new UdonVMTimeSource();
-        static bool _active;
+        static readonly bool _active;
 
         public static bool Patched { get; private set; }
 
@@ -31,15 +31,9 @@ namespace MagmaVRC.UdonVM
             {
                 Debug.LogWarning($"[UdonVM] failed to patch UdonManager.ConstructUdonVM: {e.Message}");
             }
-            EditorApplication.playModeStateChanged += s =>
-            {
-                if (s == PlayModeStateChange.ExitingEditMode)
-                {
-                    _active = FastUdonVMSettings.Enabled;
-                    FastUdonVMStats.Reset();
-                    if (_active) Debug.Log("[UdonVM] Fast VM active for this play session.");
-                }
-            };
+            _active = EditorApplication.isPlayingOrWillChangePlaymode && FastUdonVMSettings.Enabled;
+            FastUdonVMStats.Enabled = _active;
+            if (_active) Debug.Log("[UdonVM] Fast VM active for this play session.");
         }
 
         static void ConstructPostfix(UdonManager __instance, ref IUdonVM __result)
