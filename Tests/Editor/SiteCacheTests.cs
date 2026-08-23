@@ -69,15 +69,21 @@ namespace MagmaVRC.UdonVM.Tests
         static readonly FieldInfo ManagerField = typeof(UdonBehaviour).GetField("_udonManager", Priv);
         static readonly FieldInfo ClientField = typeof(UdonManager).GetField("_udonClientInterface", Priv);
 
+        static readonly FieldInfo InstanceField = typeof(UdonManager).GetField("_instance", BindingFlags.Static | BindingFlags.NonPublic);
+
         UdonManager _manager;
+        GameObject _managerObject;
         readonly List<UdonBehaviour> _receivers = new List<UdonBehaviour>();
 
         [SetUp]
         public void SetUp()
         {
             LogAssert.ignoreFailingMessages = true;
-            _manager = UdonManager.Instance;
-            if (ClientField.GetValue(_manager) == null) _manager.Awake();
+            // UdonManager.Instance calls DontDestroyOnLoad, which edit mode forbids; Awake alone claims the static instance.
+            _managerObject = new GameObject("SiteCacheTests.manager");
+            _manager = _managerObject.AddComponent<UdonManager>();
+            _manager.Awake();
+            if (ClientField.GetValue(_manager) == null) Assert.Ignore("UdonManager has no client interface in edit mode");
         }
 
         [TearDown]
@@ -91,6 +97,12 @@ namespace MagmaVRC.UdonVM.Tests
                 Object.DestroyImmediate(ub.gameObject);
             }
             _receivers.Clear();
+            if (_managerObject != null)
+            {
+                InstanceField.SetValue(null, null);
+                Object.DestroyImmediate(_managerObject);
+                _managerObject = null;
+            }
             LogAssert.ignoreFailingMessages = false;
         }
 

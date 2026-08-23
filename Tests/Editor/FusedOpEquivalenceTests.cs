@@ -25,7 +25,10 @@ namespace MagmaVRC.UdonVM.Tests
         static readonly IUdonWrapper Wrapper = new UdonClientInterface().GetWrapper();
         static readonly Type[] Pool = { typeof(int), typeof(float), typeof(string), typeof(bool), typeof(object), typeof(Vector3), typeof(int[]), typeof(char), typeof(long) };
 
-        public static IEnumerable<string> Signatures => FusedOps.Signatures.OrderBy(s => s, StringComparer.Ordinal);
+        // Signatures taking a UnityEngine.Object need live scene objects and the security filter; ObjectOpTests covers them.
+        public static IEnumerable<string> Signatures => FusedOps.Signatures
+            .Where(s => !FusedOps.SlotTypes(s).Any(t => typeof(UnityEngine.Object).IsAssignableFrom(t)))
+            .OrderBy(s => s, StringComparer.Ordinal);
 
         [Test, TestCaseSource(nameof(Signatures))]
         public void ParameterCountMatchesWrapper(string signature)

@@ -40,9 +40,9 @@ namespace MagmaVRC.UdonVM.Tests
             {
                 foreach (var entry in entries)
                 {
-                    vm.SetProgramCounter(program.EntryPoints.GetAddressFromSymbol(entry));
                     for (int i = 0; i < runs; i++)
                     {
+                        vm.SetProgramCounter(program.EntryPoints.GetAddressFromSymbol(entry));
                         o.Results.Add(vm.Interpret());
                         o.ProgramCounters.Add(vm.GetProgramCounter());
                     }
@@ -92,15 +92,20 @@ namespace MagmaVRC.UdonVM.Tests
                 var (sa, sb, _) = stock[i];
                 var (fa, fb, _) = fast[i];
                 Assert.AreEqual(sa, fa, "heap address order");
-                if (sb.GetType().Name.StartsWith("StrongBox`1") && sb.Value != null && sb.Value.GetType().Name == "CachedUdonExternDelegate")
+                if (IsExternSignature(sb.Value) || IsExternSignature(fb.Value))
                 {
-                    Assert.AreEqual(sb.Value.ToString(), fb.Value, $"extern signature at 0x{sa:X8}");
+                    Assert.AreEqual(SignatureText(sb.Value), SignatureText(fb.Value), $"extern signature at 0x{sa:X8}");
                     continue;
                 }
                 Assert.AreEqual(sb.GetType(), fb.GetType(), $"box type at 0x{sa:X8}");
                 Assert.IsTrue(ValueEquals(sb.Value, fb.Value), $"value at 0x{sa:X8}: stock={Show(sb.Value)} fast={Show(fb.Value)}");
             }
         }
+
+        // The stock VM replaces an extern signature slot with its cached delegate; compare such slots by signature text.
+        static bool IsExternSignature(object v) => v != null && v.GetType().Name == "CachedUdonExternDelegate";
+
+        static string SignatureText(object v) => v as string ?? v?.ToString();
 
         static bool ValueEquals(object a, object b)
         {
