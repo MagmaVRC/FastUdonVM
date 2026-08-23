@@ -41,6 +41,8 @@ namespace MagmaVRC.UdonVM
             public FusedOp Fused;
             public uint[] Addresses;
             public uint Length;
+            public bool Branch;
+            public uint BranchTarget;
         }
 
         uint[] _words;
@@ -89,7 +91,12 @@ namespace MagmaVRC.UdonVM
                     uint j = i;
                     int pushes = 0;
                     while (j < words.Length && (OpCode)words[j] == OpCode.PUSH) { j += 2; pushes++; }
-                    if (j < words.Length && (OpCode)words[j] == OpCode.EXTERN)
+                    if (j < words.Length && (OpCode)words[j] == OpCode.JUMP_IF_FALSE)
+                    {
+                        supers ??= new Super[words.Length];
+                        supers[j - 2] = new Super { Branch = true, Addresses = new[] { words[j - 1] }, BranchTarget = words[j + 1], Length = 16 };
+                    }
+                    else if (j < words.Length && (OpCode)words[j] == OpCode.EXTERN)
                     {
                         var e = externs[j];
                         if (e?.Fused != null && e.ParameterCount <= pushes)
@@ -206,7 +213,22 @@ namespace MagmaVRC.UdonVM
                         case OpCode.PUSH:
                         {
                             var s = supers?[w];
-                            if (s != null)
+                            if (s != null && s.Branch)
+                            {
+                                uint addr = s.Addresses[0];
+                                if (addr < boxes.Length && boxes[addr] is StrongBox<bool> cond)
+                                {
+                                    CheckExecutionTimeLimit(start, debuggerAttached);
+                                    if (!cond.Value)
+                                    {
+                                        CheckJumpTarget(s.BranchTarget);
+                                        _pc = s.BranchTarget;
+                                    }
+                                    else _pc += s.Length;
+                                    break;
+                                }
+                            }
+                            else if (s != null)
                             {
                                 CheckExecutionTimeLimit(start, debuggerAttached);
                                 bool done;

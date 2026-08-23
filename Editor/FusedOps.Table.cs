@@ -102,6 +102,22 @@ namespace MagmaVRC.UdonVM
 
         static partial void Register()
         {
+            Add("UnityEngineTime.__get_deltaTime__SystemSingle", new[] { typeof(float) }, (h, p) => Const(h, p, Time.deltaTime));
+            Add("UnityEngineTime.__get_fixedDeltaTime__SystemSingle", new[] { typeof(float) }, (h, p) => Const(h, p, Time.fixedDeltaTime));
+            Add("UnityEngineTime.__get_unscaledDeltaTime__SystemSingle", new[] { typeof(float) }, (h, p) => Const(h, p, Time.unscaledDeltaTime));
+            Add("UnityEngineTime.__get_smoothDeltaTime__SystemSingle", new[] { typeof(float) }, (h, p) => Const(h, p, Time.smoothDeltaTime));
+            Add("UnityEngineTime.__get_time__SystemSingle", new[] { typeof(float) }, (h, p) => Const(h, p, Time.time));
+            Add("UnityEngineTime.__get_timeSinceLevelLoad__SystemSingle", new[] { typeof(float) }, (h, p) => Const(h, p, Time.timeSinceLevelLoad));
+            Add("UnityEngineTime.__get_unscaledTime__SystemSingle", new[] { typeof(float) }, (h, p) => Const(h, p, Time.unscaledTime));
+            Add("UnityEngineTime.__get_fixedTime__SystemSingle", new[] { typeof(float) }, (h, p) => Const(h, p, Time.fixedTime));
+            Add("UnityEngineTime.__get_frameCount__SystemInt32", new[] { typeof(int) }, (h, p) => Const(h, p, Time.frameCount));
+            Add("UnityEngineTime.__get_timeAsDouble__SystemDouble", new[] { typeof(double) }, (h, p) => Const(h, p, Time.timeAsDouble));
+            Add("SystemArray.__get_Length__SystemInt32", new[] { typeof(Array), typeof(int) }, (h, p) =>
+            {
+                if (p[0] >= h.Length || p[1] >= h.Length || !(h[p[0]]?.Value is Array a)) return false;
+                HeapAccess.Set(h, p[1], a.Length);
+                return true;
+            });
             Add("SystemBoolean.__CompareTo__SystemBoolean__SystemInt32", new[] { typeof(bool), typeof(bool), typeof(int) }, (h, p) => Binary<bool, bool, int>(h, p, (a, b) => a.CompareTo(b)));
             Add("SystemBoolean.__Equals__SystemBoolean__SystemBoolean", new[] { typeof(bool), typeof(bool), typeof(bool) }, (h, p) => Binary<bool, bool, bool>(h, p, (a, b) => a.Equals(b)));
             Add("SystemBoolean.__GetHashCode__SystemInt32", new[] { typeof(bool), typeof(int) }, (h, p) => Unary<bool, int>(h, p, (a) => a.GetHashCode()));
