@@ -94,7 +94,7 @@ namespace MagmaVRC.UdonVM.Tests
             LogAssert.ignoreFailingMessages = false;
         }
 
-        // ponytail: no public edit-mode load path (InitializeUdonContent needs a play-mode UdonManager), so wire the private fields directly
+        // No public edit-mode load path exists (InitializeUdonContent needs a play-mode UdonManager), so the private fields are wired directly.
         UdonBehaviour MakeReceiver(string source)
         {
             var ub = new GameObject("SiteCacheTests.receiver").AddComponent<UdonBehaviour>();

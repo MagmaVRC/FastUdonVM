@@ -97,7 +97,7 @@ namespace MagmaVRC.UdonVM.Tests
                         case OpCode.JUMP:
                             if (operand == uint.MaxValue - 3) goto next;
                             work.Push(operand);
-                            pc += 8; // ponytail: also fall through past JUMP so U# call sites stay covered; over-approximates reachability
+                            pc += 8; // Also fall through past JUMP so call sites stay covered; over-approximates reachability.
                             continue;
                         case OpCode.JUMP_IF_FALSE:
                             work.Push(operand);

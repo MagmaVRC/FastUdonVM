@@ -114,7 +114,7 @@ namespace MagmaVRC.UdonVM.Tests
                 return true;
             }
             if (a.GetType() != b.GetType()) return false;
-            // ponytail: reference-typed heap objects (components, heap references) compare by type only; add per-type comparers if the corpus needs them.
+            // Reference-typed heap objects (components, heap references) compare by type only.
             if (!a.GetType().IsPrimitive && !(a is string) && !(a is IStructuralEquatable) && !a.GetType().IsValueType && !a.GetType().IsEnum) return true;
             return a.Equals(b);
         }

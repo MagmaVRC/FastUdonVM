@@ -9,7 +9,7 @@ namespace MagmaVRC.UdonVM
 {
     public static partial class FusedOps
     {
-        // ponytail: one process-wide filter (one live wrapper in play mode); bind per VM if wrappers ever diverge
+        // One process-wide filter; play mode has a single live wrapper.
         static IUdonSecurityFilter<Object> _boundFilter;
         static bool _objectsRegistered;
         static bool _resolveTried;
@@ -95,7 +95,7 @@ namespace MagmaVRC.UdonVM
         {
             if (_filter == null || p[2] >= h.Length || !ReadUnity(h, p[0], out var a) || !ReadObject(h, p[1], out var b)) return false;
             _filter.ApplyFilter(ref a);
-            // ponytail: null receiver falls back so the wrapper throws its own NRE; filter runs twice on that path, harmless
+            // A null receiver falls back so the wrapper throws its own exception.
             if (a is null) return false;
             _filter.ApplyFilter(ref b);
             HeapAccess.Set(h, p[2], ((object)a).Equals(b));

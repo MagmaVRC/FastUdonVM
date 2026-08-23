@@ -15,7 +15,7 @@ namespace MagmaVRC.UdonVM
 
         public static bool Enabled
         {
-            get => EditorPrefs.GetBool(EnabledKey, false);
+            get => EditorPrefs.GetBool(EnabledKey, true);
             set => EditorPrefs.SetBool(EnabledKey, value);
         }
 

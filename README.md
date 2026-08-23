@@ -2,13 +2,12 @@
 
 An editor-only, drop-in replacement for VRChat's Udon virtual machine. It runs the same bytecode against the same heap and the same extern wrapper as the stock VM, produces the same results, and spends a fraction of the time doing it. Nothing in this package ships in a world; the client always runs the stock VM. It exists to measure what a faster VM would buy, to test worlds faster in the editor, and as a concrete, compatible proposal.
 
-The numbers below were captured with the companion Udon Profiler (`Window > Udon Profiler`), which shows per-script, per-event and per-extern cost.
-
 ## Quick start
 
 1. Drop the package into `Packages/` (Unity 2022.3, `com.vrchat.worlds` ≥ 3.7).
-2. `VRChat SDK > Udon VM > Use Fast VM`. Applies on the next play-mode entry.
-3. Optional: `Fused Ops` (on by default), `Benchmark`, `Log Stats`.
+2. Enter play mode. The fast VM and fused ops are enabled by default; `VRChat SDK > Udon VM` has the toggles (`Use Fast VM`, `Fused Ops`), a `Benchmark`, and `Log Stats`. Changes apply on the next play-mode entry.
+
+Recommended, not required: the separate Udon Profiler package (`Window > Udon Profiler`) shows per-script, per-event and per-extern cost and is what the numbers below were captured with.
 
 Run your world in play mode as usual. If anything behaves differently from the stock VM, that is a bug here - see *Compatibility*.
 
@@ -107,7 +106,7 @@ No new opcodes, no heap layout change. A program that works on the stock VM work
 
 ## Measured
 
-All numbers from the Udon Profiler in editor play mode on the same machine, same session, stock VM first.
+All numbers measured in editor play mode on the same machine, same session, stock VM first.
 
 **A real world, 300-frame window of per-frame loop events:**
 
