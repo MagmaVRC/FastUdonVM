@@ -155,7 +155,7 @@ namespace MagmaVRC.UdonVM
         public static void Run()
         {
             var editor = new UdonEditorInterface();
-            var table = new StringBuilder("FastUdonVM benchmark (" + Runs + " runs each, ms)\n");
+            var table = new StringBuilder("FastUdonVM benchmark (best of " + Runs + " runs, ms)\n");
             table.AppendLine($"{"workload",-18}{"stock",10}{"fast",10}{"fast+fused",12}{"ratio",8}{"ratio+fused",13}");
             foreach (var (name, source) in Workloads)
             {
@@ -169,18 +169,21 @@ namespace MagmaVRC.UdonVM
 
         static double Time(UdonEditorInterface editor, string source, System.Func<IUdonVM> make)
         {
-            var sw = new Stopwatch();
+            double best = double.MaxValue;
             for (int i = 0; i < Runs; i++)
             {
                 var program = editor.Assemble(source);
                 var vm = make();
                 vm.LoadProgram(program);
                 vm.SetProgramCounter(program.EntryPoints.GetAddressFromSymbol("_start"));
-                sw.Start();
+                System.GC.Collect();
+                System.GC.WaitForPendingFinalizers();
+                var sw = Stopwatch.StartNew();
                 vm.Interpret();
                 sw.Stop();
+                best = System.Math.Min(best, sw.Elapsed.TotalMilliseconds);
             }
-            return sw.Elapsed.TotalMilliseconds;
+            return best;
         }
     }
 }
