@@ -35,8 +35,17 @@ namespace MagmaVRC.UdonVM
         readonly IUdonVMTimeSource _timeSource;
         readonly bool _useFused;
 
+        sealed class Super
+        {
+            public Extern Extern;
+            public FusedOp Fused;
+            public uint[] Addresses;
+            public uint Length;
+        }
+
         uint[] _words;
         Extern[] _externs;
+        Super[] _supers;
         IUdonProgram _program;
         IUdonHeap _heap;
         IStrongBox[] _boxes;
@@ -64,7 +73,40 @@ namespace MagmaVRC.UdonVM
             _heap = program.Heap;
             _boxes = HeapAccess.Boxes(_heap);
             _externs = ResolveExterns(words);
+            _supers = _useFused && _boxes != null ? BuildSupers(words, _externs) : null;
             return true;
+        }
+
+        static Super[] BuildSupers(uint[] words, Extern[] externs)
+        {
+            Super[] supers = null;
+            uint i = 0;
+            while (i < words.Length)
+            {
+                var op = (OpCode)words[i];
+                if (op == OpCode.PUSH)
+                {
+                    uint j = i;
+                    int pushes = 0;
+                    while (j < words.Length && (OpCode)words[j] == OpCode.PUSH) { j += 2; pushes++; }
+                    if (j < words.Length && (OpCode)words[j] == OpCode.EXTERN)
+                    {
+                        var e = externs[j];
+                        if (e?.Fused != null && e.ParameterCount <= pushes)
+                        {
+                            uint first = j - (uint)e.ParameterCount * 2;
+                            var addresses = new uint[e.ParameterCount];
+                            for (int k = 0; k < e.ParameterCount; k++) addresses[k] = words[first + (uint)k * 2 + 1];
+                            supers ??= new Super[words.Length];
+                            supers[first] = new Super { Extern = e, Fused = e.Fused, Addresses = addresses, Length = (j + 2 - first) * 4 };
+                        }
+                    }
+                    i = j;
+                    continue;
+                }
+                i += op == OpCode.NOP || op == OpCode.POP || op == OpCode.COPY ? 1u : 2u;
+            }
+            return supers;
         }
 
         static bool Decode(byte[] bytes, out uint[] words)
@@ -144,6 +186,7 @@ namespace MagmaVRC.UdonVM
             long start = _timeSource.CurrentTime;
             var words = _words;
             var externs = _externs;
+            var supers = _supers;
             var heap = _heap;
             var boxes = _boxes;
             bool stats = FastUdonVMStats.Enabled;
@@ -161,9 +204,31 @@ namespace MagmaVRC.UdonVM
                             _pc += 4;
                             break;
                         case OpCode.PUSH:
+                        {
+                            var s = supers?[w];
+                            if (s != null)
+                            {
+                                CheckExecutionTimeLimit(start, debuggerAttached);
+                                bool done;
+                                try
+                                {
+                                    done = s.Fused(boxes, s.Addresses);
+                                }
+                                catch (Exception inner)
+                                {
+                                    throw ExternException(s.Extern, s.Addresses, inner);
+                                }
+                                if (done)
+                                {
+                                    if (stats) { FastUdonVMStats.Externs++; FastUdonVMStats.FusedHits++; }
+                                    _pc += s.Length;
+                                    break;
+                                }
+                            }
                             Push(words[w + 1]);
                             _pc += 8;
                             break;
+                        }
                         case OpCode.POP:
                             if (_sp == 0) { _halted = true; return ResultFailure; }
                             _sp--;
@@ -208,15 +273,15 @@ namespace MagmaVRC.UdonVM
                             if (e.ResolveError != null) throw e.ResolveError;
                             if (stats) FastUdonVMStats.Externs++;
                             Span<uint> parameters = PopSlice(e.ParameterCount);
-                            if (e.Fused != null && e.Fused(boxes, parameters))
-                            {
-                                if (stats) FastUdonVMStats.FusedHits++;
-                                _pc += 8;
-                                break;
-                            }
-                            if (stats && e.Fused != null) FastUdonVMStats.FusedFallbacks++;
                             try
                             {
+                                if (e.Fused != null && e.Fused(boxes, parameters))
+                                {
+                                    if (stats) FastUdonVMStats.FusedHits++;
+                                    _pc += 8;
+                                    break;
+                                }
+                                if (stats && e.Fused != null) FastUdonVMStats.FusedFallbacks++;
                                 e.Delegate(heap, parameters);
                             }
                             catch (Exception inner)
