@@ -1,0 +1,34 @@
+{
+    "name": "MagmaVRC.UdonVM.Tests",
+    "rootNamespace": "MagmaVRC.UdonVM.Tests",
+    "references": [
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner",
+        "MagmaVRC.UdonVM.Editor",
+        "VRC.Udon",
+        "VRC.Udon.Editor"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll",
+        "VRC.Udon.Common.dll",
+        "VRC.Udon.VM.dll",
+        "VRC.Udon.Wrapper.dll",
+        "VRC.Udon.ClientBindings.dll",
+        "VRC.Udon.EditorBindings.dll",
+        "VRCSDK3.dll",
+        "VRCSDKBase.dll",
+        "System.Collections.Immutable.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

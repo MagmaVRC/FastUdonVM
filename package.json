@@ -1,0 +1,16 @@
+{
+  "name": "dev.magmavrc.udonvm",
+  "displayName": "Fast Udon VM",
+  "version": "0.1.0",
+  "unity": "2022.3",
+  "description": "Editor-only drop-in replacement for the Udon VM with identical semantics and lower dispatch overhead.",
+  "author": {
+    "name": "MagmaVRC",
+    "email": "magma.mc@magma-mc.net",
+    "url": "https://vpm.magmamc.dev/"
+  },
+  "license": "MIT",
+  "vpmDependencies": {
+    "com.vrchat.worlds": ">=3.7.0 <4.0.0"
+  }
+}

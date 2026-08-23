@@ -1,0 +1,30 @@
+{
+    "name": "MagmaVRC.UdonVM.Editor",
+    "rootNamespace": "MagmaVRC.UdonVM",
+    "references": [
+        "VRC.Udon",
+        "VRC.Udon.Editor"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "0Harmony.dll",
+        "VRC.Udon.Common.dll",
+        "VRC.Udon.VM.dll",
+        "VRC.Udon.Wrapper.dll",
+        "VRC.Udon.ClientBindings.dll",
+        "VRC.Udon.EditorBindings.dll",
+        "VRC.Udon.UAssembly.dll",
+        "VRCSDK3.dll",
+        "VRCSDKBase.dll",
+        "System.Collections.Immutable.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
