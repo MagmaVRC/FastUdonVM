@@ -22,6 +22,7 @@ namespace MagmaVRC.UdonVM
             public UdonExternDelegate Delegate;
             public int ParameterCount;
             public FusedOp Fused;
+            public SiteCache Site;
             public Exception ResolveError;
         }
 
@@ -63,6 +64,7 @@ namespace MagmaVRC.UdonVM
             _wrapper = wrapper ?? throw new ArgumentNullException(nameof(wrapper));
             _timeSource = timeSource ?? throw new ArgumentNullException(nameof(timeSource));
             _useFused = useFusedOps;
+            if (useFusedOps) FusedOps.BindFilter(wrapper);
         }
 
         public bool LoadProgram(IUdonProgram program)
@@ -180,7 +182,11 @@ namespace MagmaVRC.UdonVM
                 e.ResolveError = ex;
                 return e;
             }
-            if (_useFused && _boxes != null) e.Fused = FusedOps.Get(signature);
+            if (_useFused && _boxes != null)
+            {
+                e.Fused = FusedOps.Get(signature);
+                e.Site = SiteCache.Create(_wrapper, signature);
+            }
             return e;
         }
 
@@ -304,6 +310,21 @@ namespace MagmaVRC.UdonVM
                                     break;
                                 }
                                 if (stats && e.Fused != null) FastUdonVMStats.FusedFallbacks++;
+                                var site = e.Site;
+                                if (site != null)
+                                {
+                                    if (site.TryRun(boxes, heap, parameters))
+                                    {
+                                        if (stats) FastUdonVMStats.SiteCacheHits++;
+                                        _pc += 8;
+                                        break;
+                                    }
+                                    if (stats) FastUdonVMStats.SiteCacheMisses++;
+                                    e.Delegate(heap, parameters);
+                                    site.Warm(boxes, parameters);
+                                    _pc += 8;
+                                    break;
+                                }
                                 e.Delegate(heap, parameters);
                             }
                             catch (Exception inner)

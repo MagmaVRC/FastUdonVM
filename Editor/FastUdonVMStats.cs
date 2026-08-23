@@ -8,10 +8,12 @@ namespace MagmaVRC.UdonVM
         public static long Externs;
         public static long FusedHits;
         public static long FusedFallbacks;
+        public static long SiteCacheHits;
+        public static long SiteCacheMisses;
 
         public static void Reset()
         {
-            Instructions = Externs = FusedHits = FusedFallbacks = 0;
+            Instructions = Externs = FusedHits = FusedFallbacks = SiteCacheHits = SiteCacheMisses = 0;
         }
     }
 }
