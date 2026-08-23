@@ -2,3 +2,5 @@
 .vs/
 *.csproj
 *.sln
+CHANGELOG.md
+CHANGELOG.md.meta
