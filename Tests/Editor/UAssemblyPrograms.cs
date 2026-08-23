@@ -35,6 +35,7 @@ namespace MagmaVRC.UdonVM.Tests
 .code_start
     .export _start
     _start:
+    NOP
     loop:
     PUSH, i
     PUSH, n
@@ -69,6 +70,7 @@ namespace MagmaVRC.UdonVM.Tests
 .code_start
     .export _start
     _start:
+    NOP
     loop:
     PUSH, i
     PUSH, n
@@ -429,6 +431,7 @@ namespace MagmaVRC.UdonVM.Tests
 .code_start
     .export _start
     _start:
+    NOP
     loop:
     JUMP, loop
 .code_end

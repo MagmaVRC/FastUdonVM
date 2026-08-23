@@ -4,6 +4,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 using VRC.Udon.ClientBindings;
 using VRC.Udon.Common;
 using VRC.Udon.Common.Interfaces;
@@ -12,6 +13,12 @@ namespace MagmaVRC.UdonVM.Tests
 {
     public class FusedOpEquivalenceTests
     {
+        [SetUp]
+        public void IgnoreUnityAsserts() => LogAssert.ignoreFailingMessages = true;
+
+        [TearDown]
+        public void RestoreUnityAsserts() => LogAssert.ignoreFailingMessages = false;
+
         const uint HeapSize = 16;
         const int Seeds = 50;
 
@@ -29,6 +36,7 @@ namespace MagmaVRC.UdonVM.Tests
         [Test, TestCaseSource(nameof(Signatures))]
         public void MatchesWrapper(string signature)
         {
+            LogAssert.ignoreFailingMessages = true;
             var del = Wrapper.GetExternFunctionDelegate(signature);
             var fused = FusedOps.Get(signature);
             var types = FusedOps.SlotTypes(signature);
@@ -93,7 +101,7 @@ namespace MagmaVRC.UdonVM.Tests
 
         static object Value(System.Random rng, Type t)
         {
-            if (t == typeof(int)) return rng.Next(10) < 7 ? rng.Next(-2, 12) : (int)Bits(rng);
+            if (t == typeof(int)) return rng.Next(10) < 7 ? rng.Next(-2, 12) : rng.Next(3) == 0 ? int.MinValue : (int)(Bits(rng) % 4096) * (rng.Next(2) == 0 ? 1 : -1);
             if (t == typeof(uint)) return rng.Next(10) < 7 ? (uint)rng.Next(0, 12) : Bits(rng);
             if (t == typeof(long)) return rng.Next(10) < 7 ? (long)rng.Next(-2, 12) : (long)(((ulong)Bits(rng) << 32) | Bits(rng));
             if (t == typeof(ulong)) return rng.Next(10) < 7 ? (ulong)rng.Next(0, 12) : ((ulong)Bits(rng) << 32) | Bits(rng);

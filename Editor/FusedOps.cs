@@ -51,6 +51,15 @@ namespace MagmaVRC.UdonVM
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static bool GetField<TS, TV>(IStrongBox[] h, Span<uint> p, Func<TS, TV> f)
+        {
+            if (!Read(h, p[0], out TS s) || p[1] >= h.Length) return false;
+            HeapAccess.Set(h, p[1], f(s));
+            HeapAccess.Set(h, p[0], s);
+            return true;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static bool Unary<TA, TR>(IStrongBox[] h, Span<uint> p, Func<TA, TR> f)
         {
             if (!Read(h, p[0], out TA a) || p[1] >= h.Length) return false;
