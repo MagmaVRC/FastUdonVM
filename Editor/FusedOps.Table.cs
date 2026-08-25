@@ -100,6 +100,13 @@ namespace MagmaVRC.UdonVM
             return true;
         }
 
+        static bool ConcatObjects(IStrongBox[] h, Span<uint> p)
+        {
+            if (!ReadObject(h, p[0], out var a) || !ReadObject(h, p[1], out var b) || !Plain(a) || !Plain(b) || p[2] >= h.Length) return false;
+            HeapAccess.Set(h, p[2], string.Concat(a, b));
+            return true;
+        }
+
         static partial void Register()
         {
             Add("UnityEngineTime.__get_deltaTime__SystemSingle", new[] { typeof(float) }, (h, p) => Const(h, p, Time.deltaTime));
@@ -563,6 +570,7 @@ namespace MagmaVRC.UdonVM
             Add("SystemSingleArray.__get_Length__SystemInt32", new[] { typeof(Array), typeof(int) }, ArrayLength);
             Add("SystemString.__CompareTo__SystemString__SystemInt32", new[] { typeof(string), typeof(string), typeof(int) }, (h, p) => Binary<string, string, int>(h, p, (a, b) => a.CompareTo(b)));
             Add("SystemString.__Compare__SystemString_SystemString__SystemInt32", new[] { typeof(string), typeof(string), typeof(int) }, (h, p) => Binary<string, string, int>(h, p, (a, b) => string.Compare(a, b)));
+            Add("SystemString.__Concat__SystemObject_SystemObject__SystemString", new[] { typeof(object), typeof(object), typeof(string) }, ConcatObjects);
             Add("SystemString.__Concat__SystemString_SystemString_SystemString_SystemString__SystemString", new[] { typeof(string), typeof(string), typeof(string), typeof(string), typeof(string) }, (h, p) => Quaternary<string, string, string, string, string>(h, p, (a, b, c, d) => a + b + c + d));
             Add("SystemString.__Concat__SystemString_SystemString_SystemString__SystemString", new[] { typeof(string), typeof(string), typeof(string), typeof(string) }, (h, p) => Ternary<string, string, string, string>(h, p, (a, b, c) => a + b + c));
             Add("SystemString.__Concat__SystemString_SystemString__SystemString", new[] { typeof(string), typeof(string), typeof(string) }, (h, p) => Binary<string, string, string>(h, p, (a, b) => a + b));
@@ -604,6 +612,7 @@ namespace MagmaVRC.UdonVM
             Add("SystemString.__Trim__SystemString", new[] { typeof(string), typeof(string) }, (h, p) => Unary<string, string>(h, p, (a) => a.Trim()));
             Add("SystemString.__get_Empty__SystemString", new[] { typeof(string) }, (h, p) => Const<string>(h, p, string.Empty));
             Add("SystemString.__get_Length__SystemInt32", new[] { typeof(string), typeof(int) }, F_SystemString___get_Length__SystemInt32);
+            Add("SystemString.__op_Addition__SystemString_SystemString__SystemString", new[] { typeof(string), typeof(string), typeof(string) }, (h, p) => Binary<string, string, string>(h, p, (a, b) => a + b));
             Add("SystemString.__op_Equality__SystemString_SystemString__SystemBoolean", new[] { typeof(string), typeof(string), typeof(bool) }, F_SystemString___op_Equality__SystemString_SystemString__SystemBoolean);
             Add("SystemString.__op_Inequality__SystemString_SystemString__SystemBoolean", new[] { typeof(string), typeof(string), typeof(bool) }, (h, p) => Binary<string, string, bool>(h, p, (a, b) => a != b));
             Add("SystemStringArray.__Get__SystemInt32__SystemString", new[] { typeof(string[]), typeof(int), typeof(string) }, F_SystemStringArray___Get__SystemInt32__SystemString);
