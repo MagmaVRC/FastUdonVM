@@ -129,6 +129,13 @@ namespace MagmaVRC.UdonVM.Tests
         }
 
         [TestCase(true), TestCase(false)]
+        public void JumpIntoCompareBranch(bool fused)
+        {
+            var (stock, _) = VMDifferential.Compare(UAssemblyPrograms.JumpIntoCompareBranch, fused);
+            Assert.IsNull(stock.Error);
+        }
+
+        [TestCase(true), TestCase(false)]
         public void Watchdog(bool fused)
         {
             if (Debugger.IsAttached) Assert.Ignore("watchdog is disabled while a debugger is attached");

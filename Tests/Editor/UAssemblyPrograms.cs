@@ -424,6 +424,46 @@ namespace MagmaVRC.UdonVM.Tests
 .code_end
 ";
 
+        public static readonly string JumpIntoCompareBranch = $@"
+.data_start
+    i: %SystemInt32, 0
+    one: %SystemInt32, 1
+    n: %SystemInt32, 10
+    sum: %SystemInt32, 0
+    cond: %SystemBoolean, null
+.data_end
+.code_start
+    .export _start
+    _start:
+    NOP
+    PUSH, i
+    PUSH, n
+    PUSH, cond
+    EXTERN, ""{IntLess}""
+    JUMP, check
+    loop:
+    PUSH, sum
+    PUSH, one
+    PUSH, sum
+    EXTERN, ""{IntAdd}""
+    PUSH, i
+    PUSH, one
+    PUSH, i
+    EXTERN, ""{IntAdd}""
+    top:
+    PUSH, i
+    PUSH, n
+    PUSH, cond
+    EXTERN, ""{IntLess}""
+    check:
+    PUSH, cond
+    JUMP_IF_FALSE, done
+    JUMP, loop
+    done:
+    JUMP, 0xFFFFFFFC
+.code_end
+";
+
         public static readonly string InfiniteLoop = @"
 .data_start
     x: %SystemInt32, 1
