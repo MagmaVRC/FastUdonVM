@@ -31,6 +31,7 @@ namespace MagmaVRC.UdonVM
         const uint ResultSuccess = 0u;
         const uint ResultFailure = 1u;
         const long MaxVmTimeMs = 10000L;
+        const int ClockCheckInterval = 256;
 
         readonly IUdonWrapper _wrapper;
         readonly IUdonVMTimeSource _timeSource;
@@ -44,6 +45,8 @@ namespace MagmaVRC.UdonVM
             public uint Length;
             public bool Branch;
             public uint BranchTarget;
+            public bool Chained;
+            public uint ChainCond;
         }
 
         uint[] _words;
@@ -56,6 +59,7 @@ namespace MagmaVRC.UdonVM
         int _sp;
         uint _pc;
         bool _halted;
+        int _clockBudget;
 
         public bool DebugLogging { get; set; }
 
@@ -107,7 +111,17 @@ namespace MagmaVRC.UdonVM
                             var addresses = new uint[e.ParameterCount];
                             for (int k = 0; k < e.ParameterCount; k++) addresses[k] = words[first + (uint)k * 2 + 1];
                             supers ??= new Super[words.Length];
-                            supers[first] = new Super { Extern = e, Fused = e.Fused, Addresses = addresses, Length = (j + 2 - first) * 4 };
+                            var super = new Super { Extern = e, Fused = e.Fused, Addresses = addresses, Length = (j + 2 - first) * 4 };
+                            if (e.ParameterCount > 0 && j + 5 < (uint)words.Length
+                                && (OpCode)words[j + 2] == OpCode.PUSH
+                                && (OpCode)words[j + 4] == OpCode.JUMP_IF_FALSE
+                                && words[j + 3] == addresses[e.ParameterCount - 1])
+                            {
+                                super.Chained = true;
+                                super.ChainCond = words[j + 3];
+                                super.BranchTarget = words[j + 5];
+                            }
+                            supers[first] = super;
                         }
                     }
                     i = j;
@@ -224,7 +238,7 @@ namespace MagmaVRC.UdonVM
                                 uint addr = s.Addresses[0];
                                 if (addr < boxes.Length && boxes[addr] is StrongBox<bool> cond)
                                 {
-                                    CheckExecutionTimeLimit(start, debuggerAttached);
+                                    CheckExecutionTimeLimitFast(start, debuggerAttached);
                                     if (!cond.Value)
                                     {
                                         CheckJumpTarget(s.BranchTarget);
@@ -249,6 +263,17 @@ namespace MagmaVRC.UdonVM
                                 if (done)
                                 {
                                     if (stats) { FastUdonVMStats.Externs++; FastUdonVMStats.FusedHits++; }
+                                    if (s.Chained && s.ChainCond < boxes.Length && boxes[s.ChainCond] is StrongBox<bool> chained)
+                                    {
+                                        if (stats) FastUdonVMStats.Instructions++;
+                                        if (!chained.Value)
+                                        {
+                                            CheckJumpTarget(s.BranchTarget);
+                                            _pc = s.BranchTarget;
+                                        }
+                                        else _pc += s.Length + 16u;
+                                        break;
+                                    }
                                     _pc += s.Length;
                                     break;
                                 }
@@ -264,7 +289,7 @@ namespace MagmaVRC.UdonVM
                             break;
                         case OpCode.JUMP_IF_FALSE:
                         {
-                            CheckExecutionTimeLimit(start, debuggerAttached);
+                            CheckExecutionTimeLimitFast(start, debuggerAttached);
                             if (_sp == 0) { _halted = true; return ResultFailure; }
                             uint addr = _stack[--_sp];
                             bool value = boxes != null && addr < boxes.Length && boxes[addr] is StrongBox<bool> b ? b.Value : heap.GetHeapVariable<bool>(addr);
@@ -279,7 +304,7 @@ namespace MagmaVRC.UdonVM
                         }
                         case OpCode.JUMP:
                         {
-                            CheckExecutionTimeLimit(start, debuggerAttached);
+                            CheckExecutionTimeLimitFast(start, debuggerAttached);
                             uint target = words[w + 1];
                             CheckJumpTarget(target);
                             _pc = target;
@@ -287,7 +312,7 @@ namespace MagmaVRC.UdonVM
                         }
                         case OpCode.JUMP_INDIRECT:
                         {
-                            CheckExecutionTimeLimit(start, debuggerAttached);
+                            CheckExecutionTimeLimitFast(start, debuggerAttached);
                             uint addr = words[w + 1];
                             uint target = boxes != null && addr < boxes.Length && boxes[addr] is StrongBox<uint> b ? b.Value : heap.GetHeapVariable<uint>(addr);
                             CheckJumpTarget(target);
@@ -418,6 +443,14 @@ namespace MagmaVRC.UdonVM
                 case StrongBox<string> b: HeapAccess.Set(h, dest, b.Value); return true;
                 default: return false;
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void CheckExecutionTimeLimitFast(long start, bool debuggerAttached)
+        {
+            if (--_clockBudget > 0) return;
+            _clockBudget = ClockCheckInterval;
+            CheckExecutionTimeLimit(start, debuggerAttached);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
