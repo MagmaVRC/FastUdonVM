@@ -80,10 +80,10 @@ namespace MagmaVRC.UdonVM.Tests
             while (work.Count > 0)
             {
                 uint pc = work.Pop();
-                while (pc + 3 < code.Length && seen.Add(pc))
+                while ((long)pc + 3 < code.Length && seen.Add(pc))
                 {
                     var op = (OpCode)Read(code, pc);
-                    uint operand = pc + 7 < code.Length ? Read(code, pc + 4) : 0;
+                    uint operand = (long)pc + 7 < code.Length ? Read(code, pc + 4) : 0;
                     switch (op)
                     {
                         case OpCode.NOP: case OpCode.POP: case OpCode.COPY:
