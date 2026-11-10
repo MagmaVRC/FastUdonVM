@@ -1,7 +1,7 @@
 {
   "name": "dev.magmavrc.udonvm",
   "displayName": "Fast Udon VM",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "unity": "2022.3",
   "description": "Editor-only drop-in replacement for the Udon VM with identical semantics and lower dispatch overhead.",
   "author": {
