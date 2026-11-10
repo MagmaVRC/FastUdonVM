@@ -135,6 +135,39 @@ namespace MagmaVRC.UdonVM.Tests
             Assert.IsNull(stock.Error);
         }
 
+        static long CountInstructions(string source, bool fused, string[] entries = null)
+        {
+            bool enabled = FastUdonVMStats.Enabled;
+            long saved = FastUdonVMStats.Instructions;
+            try
+            {
+                FastUdonVMStats.Enabled = true;
+                FastUdonVMStats.Instructions = 0;
+                var o = VMDifferential.Run(VMDifferential.Fast(fused), UAssemblyPrograms.Assemble(source), entries ?? new[] { "_start" });
+                Assert.IsNull(o.Error);
+                return FastUdonVMStats.Instructions;
+            }
+            finally
+            {
+                FastUdonVMStats.Enabled = enabled;
+                FastUdonVMStats.Instructions = saved;
+            }
+        }
+
+        [Test]
+        public void InstructionCountMatchesStock()
+        {
+            Assert.AreEqual(150008, CountInstructions(UAssemblyPrograms.ArithmeticLoop, false));
+            Assert.AreEqual(150008, CountInstructions(UAssemblyPrograms.ArithmeticLoop, true));
+            foreach (var source in new[] { UAssemblyPrograms.StringBuilding, UAssemblyPrograms.IntArraySum, UAssemblyPrograms.MixedObjectArray, UAssemblyPrograms.BooleanLogic, UAssemblyPrograms.CallReturn, UAssemblyPrograms.NopAnnotation, UAssemblyPrograms.JumpIntoCompareBranch })
+            {
+                long plain = CountInstructions(source, false);
+                Assert.Greater(plain, 0);
+                Assert.AreEqual(plain, CountInstructions(source, true));
+            }
+            Assert.AreEqual(CountInstructions(UAssemblyPrograms.TwoEntries, false, new[] { "_a", "_b" }), CountInstructions(UAssemblyPrograms.TwoEntries, true, new[] { "_a", "_b" }));
+        }
+
         [TestCase(true), TestCase(false)]
         public void Watchdog(bool fused)
         {

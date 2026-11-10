@@ -4,6 +4,7 @@ namespace MagmaVRC.UdonVM
     public static class FastUdonVMStats
     {
         public static bool Enabled;
+        /// <summary>Udon instructions executed, counted as the stock VM would: a fused operation adds every instruction it replaces.</summary>
         public static long Instructions;
         public static long Externs;
         public static long FusedHits;

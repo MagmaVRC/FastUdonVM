@@ -24,6 +24,8 @@ namespace MagmaVRC.UdonVM
             public FusedOp Fused;
             public SiteCache Site;
             public Exception ResolveError;
+            public int ProbeId = -1;
+            public int ProbeEpoch = -1;
         }
 
         const string InstructionSetIdentifier = "UDON";
@@ -47,6 +49,8 @@ namespace MagmaVRC.UdonVM
             public uint BranchTarget;
             public bool Chained;
             public uint ChainCond;
+            public uint BranchWord;
+            public int ExtraInstructions;
         }
 
         uint[] _words;
@@ -60,6 +64,12 @@ namespace MagmaVRC.UdonVM
         uint _pc;
         bool _halted;
         int _clockBudget;
+        byte[] _probeFlags;
+        uint[] _probeHeapSlots;
+        int _probeGeneration = -1;
+        Func<IUdonProgram, byte[]> _probeClassify;
+        Func<string, int> _probeRegister;
+        int _probeEpoch;
 
         public bool DebugLogging { get; set; }
 
@@ -82,6 +92,10 @@ namespace MagmaVRC.UdonVM
             _boxes = HeapAccess.Boxes(_heap);
             _externs = ResolveExterns(words);
             _supers = _useFused && _boxes != null ? BuildSupers(words, _externs) : null;
+            _probeFlags = null;
+            _probeHeapSlots = null;
+            _probeClassify = null;
+            _probeGeneration = -1;
             return true;
         }
 
@@ -100,7 +114,7 @@ namespace MagmaVRC.UdonVM
                     if (j < words.Length && (OpCode)words[j] == OpCode.JUMP_IF_FALSE)
                     {
                         supers ??= new Super[words.Length];
-                        supers[j - 2] = new Super { Branch = true, Addresses = new[] { words[j - 1] }, BranchTarget = words[j + 1], Length = 16 };
+                        supers[j - 2] = new Super { Branch = true, Addresses = new[] { words[j - 1] }, BranchTarget = words[j + 1], Length = 16, BranchWord = j, ExtraInstructions = 1 };
                     }
                     else if (j < words.Length && (OpCode)words[j] == OpCode.EXTERN)
                     {
@@ -111,7 +125,7 @@ namespace MagmaVRC.UdonVM
                             var addresses = new uint[e.ParameterCount];
                             for (int k = 0; k < e.ParameterCount; k++) addresses[k] = words[first + (uint)k * 2 + 1];
                             supers ??= new Super[words.Length];
-                            var super = new Super { Extern = e, Fused = e.Fused, Addresses = addresses, Length = (j + 2 - first) * 4 };
+                            var super = new Super { Extern = e, Fused = e.Fused, Addresses = addresses, Length = (j + 2 - first) * 4, ExtraInstructions = e.ParameterCount };
                             if (e.ParameterCount > 0 && j + 5 < (uint)words.Length
                                 && (OpCode)words[j + 2] == OpCode.PUSH
                                 && (OpCode)words[j + 4] == OpCode.JUMP_IF_FALSE
@@ -120,6 +134,7 @@ namespace MagmaVRC.UdonVM
                                 super.Chained = true;
                                 super.ChainCond = words[j + 3];
                                 super.BranchTarget = words[j + 5];
+                                super.BranchWord = j + 4;
                             }
                             supers[first] = super;
                         }
@@ -217,6 +232,9 @@ namespace MagmaVRC.UdonVM
             var heap = _heap;
             var boxes = _boxes;
             bool stats = FastUdonVMStats.Enabled;
+            if (_probeGeneration != FastUdonVMProbe.Generation) RefreshProbe();
+            var flags = _probeFlags;
+            var probeExtern = FastUdonVMProbe.Extern;
             long limit = (long)words.Length * 4;
             try
             {
@@ -239,9 +257,11 @@ namespace MagmaVRC.UdonVM
                                 if (addr < boxes.Length && boxes[addr] is StrongBox<bool> cond)
                                 {
                                     CheckExecutionTimeLimitFast(start, debuggerAttached);
+                                    if (stats) FastUdonVMStats.Instructions += s.ExtraInstructions;
                                     if (!cond.Value)
                                     {
                                         CheckJumpTarget(s.BranchTarget);
+                                        if (flags != null && flags[s.BranchWord] != 0) ProbeJump(flags[s.BranchWord], s.BranchWord, s.BranchTarget, boxes);
                                         _pc = s.BranchTarget;
                                     }
                                     else _pc += s.Length;
@@ -262,13 +282,15 @@ namespace MagmaVRC.UdonVM
                                 }
                                 if (done)
                                 {
-                                    if (stats) { FastUdonVMStats.Externs++; FastUdonVMStats.FusedHits++; }
+                                    if (stats) { FastUdonVMStats.Instructions += s.ExtraInstructions; FastUdonVMStats.Externs++; FastUdonVMStats.FusedHits++; }
+                                    if (probeExtern != null) { var pe = s.Extern; if (pe.ProbeEpoch != _probeEpoch) AssignProbeId(pe); probeExtern(pe.ProbeId); }
                                     if (s.Chained && s.ChainCond < boxes.Length && boxes[s.ChainCond] is StrongBox<bool> chained)
                                     {
-                                        if (stats) FastUdonVMStats.Instructions++;
+                                        if (stats) FastUdonVMStats.Instructions += 2;
                                         if (!chained.Value)
                                         {
                                             CheckJumpTarget(s.BranchTarget);
+                                            if (flags != null && flags[s.BranchWord] != 0) ProbeJump(flags[s.BranchWord], s.BranchWord, s.BranchTarget, boxes);
                                             _pc = s.BranchTarget;
                                         }
                                         else _pc += s.Length + 16u;
@@ -297,6 +319,7 @@ namespace MagmaVRC.UdonVM
                             {
                                 uint target = words[w + 1];
                                 CheckJumpTarget(target);
+                                if (flags != null && flags[w] != 0) ProbeJump(flags[w], w, target, boxes);
                                 _pc = target;
                             }
                             else _pc += 8;
@@ -307,6 +330,7 @@ namespace MagmaVRC.UdonVM
                             CheckExecutionTimeLimitFast(start, debuggerAttached);
                             uint target = words[w + 1];
                             CheckJumpTarget(target);
+                            if (flags != null && flags[w] != 0) ProbeJump(flags[w], w, target, boxes);
                             _pc = target;
                             break;
                         }
@@ -316,6 +340,7 @@ namespace MagmaVRC.UdonVM
                             uint addr = words[w + 1];
                             uint target = boxes != null && addr < boxes.Length && boxes[addr] is StrongBox<uint> b ? b.Value : heap.GetHeapVariable<uint>(addr);
                             CheckJumpTarget(target);
+                            if (flags != null && flags[w] != 0) ProbeIndirect(flags[w], w, target, boxes);
                             _pc = target;
                             break;
                         }
@@ -331,6 +356,7 @@ namespace MagmaVRC.UdonVM
                                 if (e.Fused != null && e.Fused(boxes, parameters))
                                 {
                                     if (stats) FastUdonVMStats.FusedHits++;
+                                    if (probeExtern != null) { if (e.ProbeEpoch != _probeEpoch) AssignProbeId(e); probeExtern(e.ProbeId); }
                                     _pc += 8;
                                     break;
                                 }
@@ -341,6 +367,7 @@ namespace MagmaVRC.UdonVM
                                     if (site.TryRun(boxes, heap, parameters))
                                     {
                                         if (stats) FastUdonVMStats.SiteCacheHits++;
+                                        if (probeExtern != null) { if (e.ProbeEpoch != _probeEpoch) AssignProbeId(e); probeExtern(e.ProbeId); }
                                         _pc += 8;
                                         break;
                                     }
@@ -404,6 +431,82 @@ namespace MagmaVRC.UdonVM
             }
             sb.AppendLine();
             return new UdonVMException(sb.ToString(), inner);
+        }
+
+        void RefreshProbe()
+        {
+            _probeGeneration = FastUdonVMProbe.Generation;
+            var classify = FastUdonVMProbe.Classify;
+            if (!ReferenceEquals(classify, _probeClassify))
+            {
+                _probeClassify = classify;
+                byte[] flags = null;
+                uint[] slots = null;
+                if (classify != null)
+                {
+                    try
+                    {
+                        flags = classify(_program);
+                        var heapSlots = FastUdonVMProbe.HeapCallSlots;
+                        if (flags != null && heapSlots != null) slots = heapSlots(_program);
+                    }
+                    catch (Exception) { flags = null; slots = null; }
+                    if (flags != null && flags.Length != _words.Length) flags = null;
+                    if (flags == null || (slots != null && slots.Length != _words.Length)) slots = null;
+                }
+                _probeFlags = flags;
+                _probeHeapSlots = slots;
+            }
+            var register = FastUdonVMProbe.RegisterExtern;
+            if (!ReferenceEquals(register, _probeRegister)) { _probeRegister = register; _probeEpoch++; }
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        void AssignProbeId(Extern e)
+        {
+            e.ProbeEpoch = _probeEpoch;
+            try { e.ProbeId = _probeRegister != null && e.Signature != null ? _probeRegister(e.Signature) : -1; }
+            catch (Exception) { e.ProbeId = -1; }
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        void ProbeJump(byte f, uint w, uint target, IStrongBox[] boxes)
+        {
+            uint pc = w << 2;
+            try
+            {
+                if ((f & FastUdonVMProbe.CallFlag) != 0 && ReturnOnStack(boxes, pc)) { FastUdonVMProbe.Call?.Invoke(pc, target); return; }
+                var heapSlots = _probeHeapSlots;
+                if ((f & FastUdonVMProbe.HeapCallFlag) != 0 && heapSlots != null && ReturnInSlot(boxes, heapSlots[w], pc)) { FastUdonVMProbe.Call?.Invoke(pc, target); return; }
+                if ((f & FastUdonVMProbe.TailFlag) != 0) FastUdonVMProbe.Tail?.Invoke(pc, target);
+            }
+            catch (Exception) { _probeFlags = null; }
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        void ProbeIndirect(byte f, uint w, uint target, IStrongBox[] boxes)
+        {
+            uint pc = w << 2;
+            try
+            {
+                if ((f & FastUdonVMProbe.CallFlag) != 0 && ReturnOnStack(boxes, pc)) { FastUdonVMProbe.Call?.Invoke(pc, target); return; }
+                if ((f & FastUdonVMProbe.ReturnFlag) != 0) FastUdonVMProbe.Return?.Invoke(pc, target);
+            }
+            catch (Exception) { _probeFlags = null; }
+        }
+
+        bool ReturnOnStack(IStrongBox[] boxes, uint pc)
+        {
+            if (_sp == 0) return false;
+            if (boxes == null) return true;
+            uint slot = _stack[_sp - 1];
+            return slot < boxes.Length && boxes[slot] is StrongBox<uint> r && r.Value == pc + 8;
+        }
+
+        static bool ReturnInSlot(IStrongBox[] boxes, uint slot, uint pc)
+        {
+            if (boxes == null) return true;
+            return slot < boxes.Length && boxes[slot] is StrongBox<uint> r && r.Value == pc + 8;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
